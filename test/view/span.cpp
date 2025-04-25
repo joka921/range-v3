@@ -1089,6 +1089,16 @@ void test_case_iterator_constructors() {
     auto s3 = makeSpan<size_t>(v);
     CHECK((s3.size() == 3u));
     CHECK((s3[1] == 4u));
+
+    std::array<int, 3> arr {1, 2, 3};
+    auto s4 = makeSpan<int>(arr);
+    CHECK((s4.size() == 3u));
+    CHECK((s4[1] == 2));
+
+    auto sz = span<const int>({{3, 5}}).size();
+    auto el = span<const size_t>({{3, 5}})[1];
+    CHECK((sz == 2));
+    CHECK((el == 5u));
 }
 
 int main() {
