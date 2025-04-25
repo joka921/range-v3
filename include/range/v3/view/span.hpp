@@ -179,12 +179,6 @@ namespace ranges
         static constexpr index_type extent = N;
 
         constexpr span() noexcept = default;
-        /*
-        constexpr span(pointer ptr, index_type cnt) noexcept
-          : detail::span_extent<N>{cnt}
-          , data_{(RANGES_EXPECT(0 == cnt || ptr != nullptr), ptr)}
-        {}
-        */
 
         // For backwards compatibility with the unit tests.
         constexpr span(std::nullptr_t ptr, index_type cnt) noexcept
@@ -207,15 +201,6 @@ namespace ranges
                  (RANGES_EXPECT(endSentinel >= it),
                   static_cast<index_type>(endSentinel - it))}
         {}
-
-        /*
-        template<typename = void> // Artificially templatize so that the other
-                                  // constructor is preferred for {ptr, 0}
-        constexpr span(pointer first, pointer last) noexcept
-          : span{first,
-                 (RANGES_EXPECT(last >= first), static_cast<index_type>(last - first))}
-        {}
-        */
 
         template(typename Rng)(
             requires(!same_as<span, uncvref_t<Rng>>) AND span_compatible_range<Rng, T> AND
@@ -397,6 +382,10 @@ namespace ranges
                 (range_cardinality<Rng>::value < cardinality()
                      ? dynamic_extent
                      : static_cast<detail::span_index_t>(range_cardinality<Rng>::value))>;
+
+    template(typename It, typename EndOrSize)(requires contiguous_iterator<It>)
+    span(It, EndOrSize)
+      -> span<std::remove_reference_t<iter_reference_t<It>>>;
 #endif
 
     template<typename T, detail::span_index_t N>

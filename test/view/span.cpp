@@ -1063,6 +1063,34 @@ void test_case_default_constructible()
     CHECK((std::is_default_constructible<span<int, 42>>::value));
 }
 
+namespace
+{
+    template <typename T, typename... Args>
+    auto makeSpan(Args&&... args) {
+#if RANGES_CXX_DEDUCTION_GUIDES >= RANGES_CXX_DEDUCTION_GUIDES_17
+        return span{std::forward<Args>(args)...};
+#else
+        return span<T>{std::forward<Args>(args)...};
+#endif
+    }
+}
+
+// Test the constructors from iterators and the deduction guides.
+void test_case_iterator_constructors() {
+    std::vector<size_t> v {3, 4, 5};
+    auto s = makeSpan<size_t>(v.begin() + 1, v.end());
+    CHECK((s.size() == 2u));
+    CHECK((s[1] == 5u));
+
+    auto s2 = makeSpan<size_t>(v.begin(), 2u);
+    CHECK((s2.size() == 2u));
+    CHECK((s2[0] == 3u));
+
+    auto s3 = makeSpan<size_t>(v);
+    CHECK((s3.size() == 3u));
+    CHECK((s3[1] == 4u));
+}
+
 int main() {
     test_case_default_constructor();
     test_case_size_optimization();
@@ -1091,6 +1119,7 @@ int main() {
     test_case_fixed_size_conversions();
     test_case_interop_with_std_regex();
     test_case_default_constructible();
+    test_case_iterator_constructors();
 
     CPP_assert(ranges::view_<span<int>>);
     CPP_assert(ranges::contiguous_range<span<int>>);
