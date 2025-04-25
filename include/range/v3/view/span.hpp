@@ -127,6 +127,12 @@ namespace ranges
             return Count == dynamic_extent && Extent != dynamic_extent ? Extent - Offset
                                                                        : Count;
         }
+
+        template<typename T>
+        struct type_identity
+        {
+            using type = T;
+        };
     } // namespace detail
 
     // clang-format off
@@ -217,6 +223,34 @@ namespace ranges
                     Rng, N>) constexpr span(Rng &&
                                                 rng) noexcept(noexcept(ranges::data(rng)))
           : span{ranges::data(rng), N}
+        {}
+
+        // Implicit construction from C-Arrays.
+        template<size_t M>
+        static constexpr bool is_compatible_extent = (N == dynamic_extent) || (N == M);
+
+        template(size_t M)(requires is_compatible_extent<M>) constexpr span(
+            typename detail::type_identity<T>::type (&arr)[M])
+          : span{arr, M}
+        {}
+
+        // Construction from `std::array`
+        template<typename To, typename From>
+        using is_array_convertible = std::is_convertible<From (*)[], To (*)[]>;
+
+        template<typename U, size_t M>
+        static constexpr bool is_compatible_array =
+            is_compatible_extent<M> && is_array_convertible<T, U>::value;
+
+        template(class U, std::size_t M)(
+            requires is_compatible_array<U, M>) constexpr span(std::array<U, N> &
+                                                                   arr) noexcept
+          : span{arr.data(), N}
+        {}
+        template(class U, std::size_t M)(
+            requires is_compatible_array<
+                const U, M>) constexpr span(const std::array<U, N> & arr) noexcept
+          : span{arr.data(), N}
         {}
 
         template<index_type Count>
@@ -384,8 +418,7 @@ namespace ranges
                      : static_cast<detail::span_index_t>(range_cardinality<Rng>::value))>;
 
     template(typename It, typename EndOrSize)(requires contiguous_iterator<It>)
-    span(It, EndOrSize)
-      -> span<std::remove_reference_t<iter_reference_t<It>>>;
+        span(It, EndOrSize) -> span<std::remove_reference_t<iter_reference_t<It>>>;
 #endif
 
     template<typename T, detail::span_index_t N>
