@@ -15,6 +15,7 @@
 #define RANGES_V3_VIEW_SPAN_HPP
 
 #include <cstddef>
+#include <type_traits>
 
 #include <meta/meta.hpp>
 
@@ -60,10 +61,27 @@ namespace ranges
                    static_cast<To>(from);
         }
 
+        // A simple reimplementation of `std::to_address` which doesn't support fancy
+        // pointers, as they require C++20.
+        template<typename T>
+        constexpr T * to_address(T * p) noexcept
+        {
+            static_assert(!std::is_function<T>::value,
+                          "to address for function pointers is ill-formed");
+            return p;
+        }
+        template<typename T>
+        constexpr auto to_address(const T & it) noexcept
+        {
+            return it.operator->();
+        }
+
         template<typename T>
         constexpr span_index_t byte_size(span_index_t n) noexcept
         {
-            return n == dynamic_extent ? dynamic_extent : (RANGES_EXPECT(n <= SIZE_MAX / sizeof(T)), n * sizeof(T));
+            return n == dynamic_extent
+                       ? dynamic_extent
+                       : (RANGES_EXPECT(n <= SIZE_MAX / sizeof(T)), n * sizeof(T));
         }
 
         template<span_index_t N>
@@ -161,15 +179,27 @@ namespace ranges
         static constexpr index_type extent = N;
 
         constexpr span() noexcept = default;
-        constexpr span(pointer ptr, index_type cnt) noexcept
-          : detail::span_extent<N>{cnt}
-          , data_{(RANGES_EXPECT(0 == cnt || ptr != nullptr), ptr)}
+
+        // For backwards compatibility with the unit tests.
+        constexpr span(std::nullptr_t ptr, index_type cnt) noexcept
+          : detail::span_extent<N>(cnt)
+          , data_{(RANGES_EXPECT(0 == cnt), ptr)}
         {}
-        template<typename = void> // Artificially templatize so that the other
-                                  // constructor is preferred for {ptr, 0}
-        constexpr span(pointer first, pointer last) noexcept
-          : span{first,
-                 (RANGES_EXPECT(last >= first), static_cast<index_type>(last - first))}
+
+        template(typename It)(requires contiguous_iterator<It>) constexpr span(
+            It it, index_type cnt) noexcept
+          : detail::span_extent<N>{cnt}
+          , data_{(RANGES_EXPECT(0 == cnt || detail::to_address(it) != nullptr),
+                   detail::to_address(it))}
+        {}
+
+        template(typename It, typename End)(
+            requires contiguous_iterator<It> AND
+                sized_sentinel_for<End, It>) constexpr span(It it,
+                                                            End endSentinel) noexcept
+          : span{it,
+                 (RANGES_EXPECT(endSentinel >= it),
+                  static_cast<index_type>(endSentinel - it))}
         {}
 
         template(typename Rng)(
@@ -352,6 +382,10 @@ namespace ranges
                 (range_cardinality<Rng>::value < cardinality()
                      ? dynamic_extent
                      : static_cast<detail::span_index_t>(range_cardinality<Rng>::value))>;
+
+    template(typename It, typename EndOrSize)(requires contiguous_iterator<It>)
+    span(It, EndOrSize)
+      -> span<std::remove_reference_t<iter_reference_t<It>>>;
 #endif
 
     template<typename T, detail::span_index_t N>
