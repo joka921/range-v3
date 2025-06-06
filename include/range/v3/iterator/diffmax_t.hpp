@@ -34,6 +34,8 @@ namespace ranges
     /// \cond
     namespace detail
     {
+        using diffmax_t = std::ptrdiff_t;
+        /*
         struct diffmax_t
         {
         private:
@@ -339,7 +341,9 @@ namespace ranges
                 return sout << (&"-"[!a.neg_]) << a.val_;
             }
         };
+         */
 
+        /*
 #if RANGES_CXX_INLINE_VARIABLES >= RANGES_CXX_INLINE_VARIABLES_17
         template<>
         inline constexpr bool _is_integer_like_<diffmax_t> = true;
@@ -426,10 +430,12 @@ namespace ranges
         template<bool B>
         constexpr bool const diffmax_numeric_limits<B>::tinyness_before;
 #endif
+*/
     } // namespace detail
     /// \endcond
 } // namespace ranges
 
+/*
 /// \cond
 RANGES_DIAGNOSTIC_IGNORE_MISMATCHED_TAGS
 
@@ -493,6 +499,7 @@ namespace std
     {};
 } // namespace std
 /// \endcond
+         */
 
 RANGES_DIAGNOSTIC_POP
 
