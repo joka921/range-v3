@@ -106,8 +106,8 @@ namespace ranges
             auto operator()(Rng && rng) const
             {
                 using D = range_difference_t<Rng>;
-                using S = detail::iter_size_t<iterator_t<Rng>>;
-                return zip(detail::index_view<S, D>(), all(static_cast<Rng &&>(rng)));
+                //using S = detail::iter_size_t<iterator_t<Rng>>;
+                return zip(detail::index_view<D, D>(), all(static_cast<Rng &&>(rng)));
             }
         };
 
