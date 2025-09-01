@@ -44,6 +44,10 @@
 
 #include <range/v3/detail/prologue.hpp>
 
+#ifdef RANGE_V3_COMBINE_WITH_STD
+#include <ranges>
+#endif
+
 namespace ranges
 {
     /// \addtogroup group-range-concepts
@@ -223,9 +227,15 @@ namespace ranges
     /// \endcond
 
     // Specialize this if the default is wrong.
+#ifndef RANGE_V3_COMBINE_WITH_STD
     template<typename T>
     RANGES_INLINE_VAR constexpr bool enable_view =
         ext::enable_view<T>::value;
+#else
+    template<typename T>
+    RANGES_INLINE_VAR constexpr bool enable_view =
+        ext::enable_view<T>::value || std::ranges::enable_view<T>;
+#endif
 
 #if defined(__cpp_lib_string_view) && __cpp_lib_string_view >= 201603L
     template<typename Char, typename Traits>

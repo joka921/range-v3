@@ -26,6 +26,10 @@
 #include <range/v3/utility/static_const.hpp>
 #include <range/v3/version.hpp>
 
+#ifdef RANGE_V3_COMBINE_WITH_STD
+#include <ranges>
+#endif
+
 /// \defgroup group-iterator Iterator
 /// Iterator functionality
 
@@ -178,8 +182,13 @@ namespace ranges
     template<typename T>
     struct incrementable_traits;
 
+#ifdef RANGE_V3_COMBINE_WITH_STD
+    struct view_base : std::ranges::view_base
+    {};
+#else
     struct view_base
     {};
+#endif
 
     /// \cond
     namespace detail
