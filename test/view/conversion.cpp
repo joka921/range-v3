@@ -59,9 +59,9 @@ int main()
 
     {
         std::string s{"abc"};
-        any_view<any_view<char, category::random_access>, category::random_access> v1 =
+        any_view<any_view<char, category::random_access | category::copyable>, category::random_access | category::copyable> v1 =
             views::single(s | views::drop(1));
-        any_view<any_view<char, category::random_access>, category::random_access> v2 =
+        any_view<any_view<char, category::random_access | category::copyable>, category::random_access | category::copyable> v2 =
             views::single(s | views::drop(2));
         auto v3 = views::concat(v1, v2);
 

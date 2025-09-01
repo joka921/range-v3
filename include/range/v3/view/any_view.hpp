@@ -47,9 +47,12 @@ namespace ranges
         forward = 3,          ///<\brief satisfies ranges::concepts::forward_range
         bidirectional = 7,    ///<\brief satisfies ranges::concepts::bidirectional_range
         random_access = 15,   ///<\brief satisfies ranges::concepts::random_access_range
-        mask = random_access, ///<\brief Mask away any properties other than iterator
+        contiguous = 31,      ///<\brief satisfies ranges::concepts::contiguous_range
+        mask = contiguous, ///<\brief Mask away any properties other than iterator
                               ///< category
-        sized = 16,           ///<\brief satisfies ranges::concepts::sized_range
+        sized = 32,           ///<\brief satisfies ranges::concepts::sized_range
+        borrowed = 64,
+        copyable = 128
     };
 
     /** \name Binary operators for ranges::category
@@ -108,7 +111,10 @@ namespace ranges
                (forward_range<Rng> ? category::forward : category::none) |
                (bidirectional_range<Rng> ? category::bidirectional : category::none) |
                (random_access_range<Rng> ? category::random_access : category::none) |
-               (sized_range<Rng> ? category::sized : category::none);
+               (contiguous_range<Rng> ? category::contiguous : category::none) |
+               (sized_range<Rng> ? category::sized : category::none) |
+               (borrowed_range<Rng> ? category::borrowed : category::none) |
+               (copyable<std::remove_reference_t<Rng>> ? category::copyable : category::none);
     }
 
     /// \cond
@@ -533,7 +539,13 @@ namespace ranges
             }
             std::unique_ptr<any_cloneable_view_interface<Ref, Cat>> clone() const override
             {
-                return detail::make_unique<any_view_impl>(range_box_t::get());
+                if constexpr((Cat & category::copyable) == category::copyable)
+                {
+                    return detail::make_unique<any_view_impl>(range_box_t::get());
+                } else
+                {
+                    throw std::runtime_error("This code should be unreachable.");
+                }
             }
             std::size_t size() // override-ish
             {
@@ -545,7 +557,7 @@ namespace ranges
 
     /// \brief A type-erased view
     /// \ingroup group-views
-    template<typename Ref, category Cat = category::input, typename enable = void>
+    template<typename Ref, category Cat = category::input | category::copyable, typename enable = void>
     struct any_view
       : view_facade<any_view<Ref, Cat>,
                     (Cat & category::sized) == category::sized ? finite : unknown>
@@ -564,16 +576,9 @@ namespace ranges
                      meta::bool_<(get_categories<Rng>() & Cat) == Cat>{})
         {}
         any_view(any_view &&) = default;
-        any_view(any_view const & that)
-          : ptr_{that.ptr_ ? that.ptr_->clone() : nullptr}
-        {}
+        any_view(any_view const & that) = default;
         any_view & operator=(any_view &&) = default;
-        any_view & operator=(any_view const & that)
-        {
-            ptr_ = (that.ptr_ ? that.ptr_->clone() : nullptr);
-            return *this;
-        }
-
+        any_view & operator=(any_view const & that) = default;
         CPP_member
         auto size() //
             -> CPP_ret(std::size_t)(
@@ -606,7 +611,35 @@ namespace ranges
             return detail::any_sentinel{*ptr_};
         }
 
-        std::unique_ptr<detail::any_cloneable_view_interface<Ref, Cat>> ptr_;
+        template <typename T, bool isCopyable = false>
+        struct PossiblyCopyablePtr : std::unique_ptr<T>
+        {};
+        template <typename T>
+        struct PossiblyCopyablePtr<T, true> : std::unique_ptr<T>
+        {
+            using P = std::unique_ptr<T>;
+            using P::P;
+            const P& ptr() const
+            {
+                return static_cast<const P&>(*this);
+            }
+            P& ptr()
+            {
+                return static_cast<P&>(*this);
+            }
+            PossiblyCopyablePtr(PossiblyCopyablePtr const & that)
+              : P{that.ptr() ? that.ptr()->clone() : nullptr}
+            {}
+            PossiblyCopyablePtr& operator=(PossiblyCopyablePtr const & that)
+            {
+                ptr() = (that.ptr() ? that.ptr()->clone() : nullptr);
+                return *this;
+            }
+            PossiblyCopyablePtr(PossiblyCopyablePtr&&) = default;
+            PossiblyCopyablePtr& operator=(PossiblyCopyablePtr&&) = default;
+
+        };
+        PossiblyCopyablePtr<detail::any_cloneable_view_interface<Ref, Cat>, (Cat & category::copyable) == category::copyable> ptr_;
     };
 
     // input and not forward
