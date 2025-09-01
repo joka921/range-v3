@@ -29,9 +29,6 @@
 #include <range/v3/range/traits.hpp>
 
 #include <range/v3/detail/prologue.hpp>
-#ifdef RANGE_V3_COMBINE_WITH_STD
-#include <ranges>
-#endif
 
 #if defined(RANGES_WORKAROUND_GCC_91525)
 #define CPP_template_gcc_workaround CPP_template_sfinae
@@ -512,13 +509,6 @@ namespace ranges
     }
     /// @}
 } // namespace ranges
-
-#ifdef RANGE_V3_COMBINE_WITH_STD
-template<typename Derived, ::ranges::cardinality Cardinality /* = finite*/>
-inline constexpr bool std::ranges::enable_view<::ranges::view_interface<Derived, Cardinality>> = true;
-#endif
-
-
 
 #include <range/v3/detail/epilogue.hpp>
 
