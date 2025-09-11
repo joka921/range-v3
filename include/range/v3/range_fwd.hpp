@@ -944,6 +944,11 @@ namespace ranges
 /// \endcond
 ///
 
+#ifdef RANGE_V3_COMBINE_WITH_STD
+CPP_template(class T)(requires ::ranges::enable_borrowed_range<T>)
+inline constexpr bool std::ranges::enable_borrowed_range = true;
+#endif
+
 RANGES_DIAGNOSTIC_POP
 
 #include <range/v3/detail/epilogue.hpp>
