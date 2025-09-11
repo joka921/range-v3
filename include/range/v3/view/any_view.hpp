@@ -713,6 +713,11 @@ namespace ranges
     using any_random_access_view RANGES_DEPRECATED(
         "Use any_view<Ref, category::random_access> instead.") =
         any_view<Ref, category::random_access>;
+
+    // Make the `borrowed` any-view actually borrowed.
+    template<typename Ref, category Cat>
+    RANGES_INLINE_VAR constexpr bool enable_borrowed_range<any_view<Ref, Cat>> = Cat & category::borrowed == category::borrowed;
+    // Enable borrowed range
 } // namespace ranges
 
 #include <range/v3/detail/satisfy_boost_range.hpp>
