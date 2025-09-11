@@ -153,7 +153,7 @@ int main()
         ::check_equal(ints2, ten_ints);
     }
     {
-        any_view<int, category::random_access> ints3 = views::ints | views::take(10);
+        any_view<int, category::random_access | category::copyable> ints3 = views::ints | views::take(10);
         CPP_assert(view_<decltype(ints3)>);
         CPP_assert(random_access_range<decltype(ints3)>);
         CPP_assert(!common_range<decltype(ints3)>);
@@ -214,7 +214,7 @@ int main()
         std::vector<int> v = { 1, 2, 3, 4, 5 };
     
         using SizedAnyView =
-            any_view<int, category::random_access | category::sized>;
+            any_view<int, category::random_access | category::sized | category::copyable>;
     
         SizedAnyView av1 = v;
         SizedAnyView av2 = av1 | views::transform( [](auto){ return 0; } ); // fail

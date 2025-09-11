@@ -42,14 +42,17 @@ namespace ranges
     /// range.
     enum class category
     {
-        none = 0,             ///<\brief No concepts met.
-        input = 1,            ///<\brief satisfies ranges::concepts::input_range
-        forward = 3,          ///<\brief satisfies ranges::concepts::forward_range
-        bidirectional = 7,    ///<\brief satisfies ranges::concepts::bidirectional_range
-        random_access = 15,   ///<\brief satisfies ranges::concepts::random_access_range
-        mask = random_access, ///<\brief Mask away any properties other than iterator
-                              ///< category
-        sized = 16,           ///<\brief satisfies ranges::concepts::sized_range
+        none = 0,           ///<\brief No concepts met.
+        input = 1,          ///<\brief satisfies ranges::concepts::input_range
+        forward = 3,        ///<\brief satisfies ranges::concepts::forward_range
+        bidirectional = 7,  ///<\brief satisfies ranges::concepts::bidirectional_range
+        random_access = 15, ///<\brief satisfies ranges::concepts::random_access_range
+        contiguous = 31,    ///<\brief satisfies ranges::concepts::contiguous_range
+        mask = contiguous,  ///<\brief Mask away any properties other than iterator
+                            ///< category
+        sized = 32,         ///<\brief satisfies ranges::concepts::sized_range
+        borrowed = 64,
+        copyable = 128
     };
 
     /** \name Binary operators for ranges::category
@@ -108,7 +111,11 @@ namespace ranges
                (forward_range<Rng> ? category::forward : category::none) |
                (bidirectional_range<Rng> ? category::bidirectional : category::none) |
                (random_access_range<Rng> ? category::random_access : category::none) |
-               (sized_range<Rng> ? category::sized : category::none);
+               (contiguous_range<Rng> ? category::contiguous : category::none) |
+               (sized_range<Rng> ? category::sized : category::none) |
+               (borrowed_range<Rng> ? category::borrowed : category::none) |
+               (copyable<std::remove_reference_t<Rng>> ? category::copyable
+                                                       : category::none);
     }
 
     /// \cond
@@ -420,10 +427,9 @@ namespace ranges
         public:
             any_cursor() = default;
             template(typename Rng)(
-                requires (!same_as<detail::decay_t<Rng>, any_cursor>) AND
-                    forward_range<Rng> AND
-                    any_compatible_range<Rng, Ref>)
-            explicit any_cursor(Rng && rng)
+                requires(
+                    !same_as<detail::decay_t<Rng>, any_cursor>) AND forward_range<Rng>
+                    AND any_compatible_range<Rng, Ref>) explicit any_cursor(Rng && rng)
               : ptr_{detail::make_unique<impl_t<Rng>>(begin(rng))}
             {}
             any_cursor(any_cursor &&) = default;
@@ -458,24 +464,24 @@ namespace ranges
             }
             CPP_member
             auto prev() //
-                -> CPP_ret(void)(
-                    requires (category::bidirectional == (Cat & category::bidirectional)))
+                -> CPP_ret(void)(requires(category::bidirectional ==
+                                          (Cat & category::bidirectional)))
             {
                 RANGES_EXPECT(ptr_);
                 ptr_->prev();
             }
             CPP_member
             auto advance(std::ptrdiff_t n) //
-                -> CPP_ret(void)(
-                    requires (category::random_access == (Cat & category::random_access)))
+                -> CPP_ret(void)(requires(category::random_access ==
+                                          (Cat & category::random_access)))
             {
                 RANGES_EXPECT(ptr_);
                 ptr_->advance(n);
             }
             CPP_member
             auto distance_to(any_cursor const & that) const //
-                -> CPP_ret(std::ptrdiff_t)(
-                    requires (category::random_access == (Cat & category::random_access)))
+                -> CPP_ret(std::ptrdiff_t)(requires(category::random_access ==
+                                                    (Cat & category::random_access)))
             {
                 RANGES_EXPECT(!ptr_ == !that.ptr_);
                 return !ptr_ ? 0 : ptr_->distance_to(*that.ptr_);
@@ -533,7 +539,14 @@ namespace ranges
             }
             std::unique_ptr<any_cloneable_view_interface<Ref, Cat>> clone() const override
             {
-                return detail::make_unique<any_view_impl>(range_box_t::get());
+                if constexpr((Cat & category::copyable) == category::copyable)
+                {
+                    return detail::make_unique<any_view_impl>(range_box_t::get());
+                }
+                else
+                {
+                    throw std::runtime_error("This code should be unreachable.");
+                }
             }
             std::size_t size() // override-ish
             {
@@ -545,7 +558,8 @@ namespace ranges
 
     /// \brief A type-erased view
     /// \ingroup group-views
-    template<typename Ref, category Cat = category::input, typename enable = void>
+    template<typename Ref, category Cat = category::input | category::copyable,
+             typename enable = void>
     struct any_view
       : view_facade<any_view<Ref, Cat>,
                     (Cat & category::sized) == category::sized ? finite : unknown>
@@ -554,30 +568,21 @@ namespace ranges
         CPP_assert((Cat & category::forward) == category::forward);
 
         any_view() = default;
-        template(typename Rng)(
-            requires //
-                (!same_as<detail::decay_t<Rng>, any_view>) AND
-                input_range<Rng> AND
-                detail::any_compatible_range<Rng, Ref>)
-        any_view(Rng && rng)
+        template(typename Rng)(requires //
+                               (!same_as<detail::decay_t<Rng>, any_view>)
+                                   AND input_range<Rng>
+                                       AND detail::any_compatible_range<Rng, Ref>)
+            any_view(Rng && rng)
           : any_view(static_cast<Rng &&>(rng),
                      meta::bool_<(get_categories<Rng>() & Cat) == Cat>{})
         {}
         any_view(any_view &&) = default;
-        any_view(any_view const & that)
-          : ptr_{that.ptr_ ? that.ptr_->clone() : nullptr}
-        {}
+        any_view(any_view const & that) = default;
         any_view & operator=(any_view &&) = default;
-        any_view & operator=(any_view const & that)
-        {
-            ptr_ = (that.ptr_ ? that.ptr_->clone() : nullptr);
-            return *this;
-        }
-
+        any_view & operator=(any_view const & that) = default;
         CPP_member
         auto size() //
-            -> CPP_ret(std::size_t)(
-                requires (category::sized == (Cat & category::sized)))
+            -> CPP_ret(std::size_t)(requires(category::sized == (Cat & category::sized)))
         {
             return ptr_ ? ptr_->size() : 0;
         }
@@ -606,7 +611,36 @@ namespace ranges
             return detail::any_sentinel{*ptr_};
         }
 
-        std::unique_ptr<detail::any_cloneable_view_interface<Ref, Cat>> ptr_;
+        template<typename T, bool isCopyable = false>
+        struct PossiblyCopyablePtr : std::unique_ptr<T>
+        {};
+        template<typename T>
+        struct PossiblyCopyablePtr<T, true> : std::unique_ptr<T>
+        {
+            using P = std::unique_ptr<T>;
+            using P::P;
+            const P & ptr() const
+            {
+                return static_cast<const P &>(*this);
+            }
+            P & ptr()
+            {
+                return static_cast<P &>(*this);
+            }
+            PossiblyCopyablePtr(PossiblyCopyablePtr const & that)
+              : P{that.ptr() ? that.ptr()->clone() : nullptr}
+            {}
+            PossiblyCopyablePtr & operator=(PossiblyCopyablePtr const & that)
+            {
+                ptr() = (that.ptr() ? that.ptr()->clone() : nullptr);
+                return *this;
+            }
+            PossiblyCopyablePtr(PossiblyCopyablePtr &&) = default;
+            PossiblyCopyablePtr & operator=(PossiblyCopyablePtr &&) = default;
+        };
+        PossiblyCopyablePtr<detail::any_cloneable_view_interface<Ref, Cat>,
+                            (Cat & category::copyable) == category::copyable>
+            ptr_;
     };
 
     // input and not forward
@@ -618,19 +652,17 @@ namespace ranges
         friend range_access;
 
         any_view() = default;
-        template(typename Rng)(
-            requires //
-                (!same_as<detail::decay_t<Rng>, any_view>) AND
-                input_range<Rng> AND
-                detail::any_compatible_range<Rng, Ref>)
-        any_view(Rng && rng)
+        template(typename Rng)(requires //
+                               (!same_as<detail::decay_t<Rng>, any_view>)
+                                   AND input_range<Rng>
+                                       AND detail::any_compatible_range<Rng, Ref>)
+            any_view(Rng && rng)
           : ptr_{std::make_shared<impl_t<Rng>>(views::all(static_cast<Rng &&>(rng)))}
         {}
 
         CPP_member
         auto size() //
-            -> CPP_ret(std::size_t)(
-                requires (category::sized == (Cat & category::sized)))
+            -> CPP_ret(std::size_t)(requires(category::sized == (Cat & category::sized)))
         {
             return ptr_ ? ptr_->size() : 0;
         }
@@ -656,10 +688,8 @@ namespace ranges
     };
 
 #if RANGES_CXX_DEDUCTION_GUIDES >= RANGES_CXX_DEDUCTION_GUIDES_17
-    template(typename Rng)(
-        requires view_<Rng>)
-        any_view(Rng &&)
-            ->any_view<range_reference_t<Rng>, get_categories<Rng>()>;
+    template(typename Rng)(requires view_<Rng>) any_view(Rng &&)
+        -> any_view<range_reference_t<Rng>, get_categories<Rng>()>;
 #endif
 
     template<typename Ref>
@@ -680,6 +710,12 @@ namespace ranges
     using any_random_access_view RANGES_DEPRECATED(
         "Use any_view<Ref, category::random_access> instead.") =
         any_view<Ref, category::random_access>;
+
+    // Make the `borrowed` any-view actually borrowed.
+    template<typename Ref, category Cat>
+    RANGES_INLINE_VAR constexpr bool enable_borrowed_range<any_view<Ref, Cat>> =
+        (Cat & category::borrowed) == category::borrowed;
+    // Enable borrowed range
 } // namespace ranges
 
 #include <range/v3/detail/satisfy_boost_range.hpp>
