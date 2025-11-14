@@ -107,7 +107,10 @@ namespace ranges
                 ++current_;
                 parent_->dirty_ = true;
             }
-            bool equal(cursor const & that) const
+            CPP_member
+
+           auto equal(cursor const & that) const //
+              -> CPP_ret(bool)(requires sentinel_for<iterator_t<Rng>, iterator_t<Rng>>)
             {
                 return current_ == that.current_;
             }
