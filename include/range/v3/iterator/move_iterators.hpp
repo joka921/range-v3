@@ -39,7 +39,7 @@ namespace ranges
         using iterator_type = I;
         using difference_type = iter_difference_t<I>;
         using value_type = iter_value_t<I>;
-        using iterator_category = std::input_iterator_tag;
+        using iterator_category = typename std::iterator_traits<I>::iterator_category;
         using reference = iter_rvalue_reference_t<I>;
 
         constexpr move_iterator() = default;
@@ -441,7 +441,7 @@ namespace std
     template<typename I>
     struct iterator_traits<::ranges::move_iterator<I>>
     {
-        using iterator_category = std::input_iterator_tag;
+        using iterator_category = typename I::iterator_category;
         using difference_type = typename ::ranges::move_iterator<I>::difference_type;
         using value_type = typename ::ranges::move_iterator<I>::value_type;
         using reference = typename ::ranges::move_iterator<I>::reference;
