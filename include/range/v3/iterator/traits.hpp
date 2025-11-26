@@ -69,16 +69,26 @@ namespace ranges
 
 #if defined(RANGES_DEEP_STL_INTEGRATION) && RANGES_DEEP_STL_INTEGRATION && \
     !defined(RANGES_DOXYGEN_INVOKED)
-    template<typename T>
-    using iter_difference_t =
-        typename meta::conditional_t<detail::is_std_iterator_traits_specialized_v<T>,
-                                   std::iterator_traits<uncvref_t<T>>,
-                                   incrementable_traits<uncvref_t<T>>>::difference_type;
+    namespace detail
+    {
+        template<typename T>
+        using iter_difference_t_internal =
+            typename meta::conditional_t<detail::is_std_iterator_traits_specialized_v<T>,
+                                       std::iterator_traits<uncvref_t<T>>,
+                                       incrementable_traits<uncvref_t<T>>>::difference_type;
+    }
 #else
+    namespace detail
+    {
+        template<typename T>
+        using iter_difference_t_internal =
+            typename incrementable_traits<uncvref_t<T>>::difference_type;
+    }
+#endif
     template<typename T>
     using iter_difference_t =
-        typename incrementable_traits<uncvref_t<T>>::difference_type;
-#endif
+        meta::conditional_t<std::is_void<detail::iter_difference_t_internal<T>>::value,
+                            std::ptrdiff_t, detail::iter_difference_t_internal<T>>;
 
     // Defined in <range/v3/iterator/access.hpp>
     // template<typename T>
