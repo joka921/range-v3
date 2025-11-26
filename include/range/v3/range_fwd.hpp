@@ -946,11 +946,6 @@ namespace ranges
 
 #ifdef RANGE_V3_COMBINE_WITH_STD
 CPP_template(class T)(requires ::ranges::enable_borrowed_range<T>)
-inline constexpr bool std::ranges::enable_borrowed_range = true;
-#endif
-
-#ifdef RANGE_V3_COMBINE_WITH_STD
-CPP_template(class T)(requires ::ranges::enable_borrowed_range<T>)
 inline constexpr bool std::ranges::enable_borrowed_range<T> = true;
 #endif
 
