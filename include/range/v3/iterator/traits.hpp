@@ -69,11 +69,14 @@ namespace ranges
 
 #if defined(RANGES_DEEP_STL_INTEGRATION) && RANGES_DEEP_STL_INTEGRATION && \
     !defined(RANGES_DOXYGEN_INVOKED)
-    template<typename T>
-    using iter_difference_t =
-        typename meta::conditional_t<detail::is_std_iterator_traits_specialized_v<T>,
-                                     std::iterator_traits<uncvref_t<T>>,
-                                     incrementable_traits<uncvref_t<T>>>::difference_type;
+    namespace detail
+    {
+        template<typename T>
+        using iter_difference_t_internal =
+            typename meta::conditional_t<detail::is_std_iterator_traits_specialized_v<T>,
+                                       std::iterator_traits<uncvref_t<T>>,
+                                       incrementable_traits<uncvref_t<T>>>::difference_type;
+    }
 #else
     namespace detail
     {
@@ -81,11 +84,11 @@ namespace ranges
         using iter_difference_t_internal =
             typename incrementable_traits<uncvref_t<T>>::difference_type;
     }
+#endif
     template<typename T>
     using iter_difference_t =
         meta::conditional_t<std::is_void<detail::iter_difference_t_internal<T>>::value,
                             std::ptrdiff_t, detail::iter_difference_t_internal<T>>;
-#endif
 
     // Defined in <range/v3/iterator/access.hpp>
     // template<typename T>
@@ -105,16 +108,18 @@ namespace ranges
         template<typename I>
         using iter_size_t =
             meta::_t<meta::conditional_t<std::is_integral<iter_difference_t<I>>::value,
-                                         std::make_unsigned<iter_difference_t<I>>,
-                                         meta::id<iter_difference_t<I>>>>;
+                               std::make_unsigned<iter_difference_t<I>>,
+                               meta::id<iter_difference_t<I>>>>;
 
         template<typename I>
         using iter_arrow_t = decltype(std::declval<I &>().operator->());
 
         template<typename I>
-        using iter_pointer_t = meta::_t<meta::conditional_t<
-            meta::is_trait<meta::defer<iter_arrow_t, I>>::value,
-            meta::defer<iter_arrow_t, I>, std::add_pointer<iter_reference_t<I>>>>;
+        using iter_pointer_t =
+            meta::_t<meta::conditional_t<
+                        meta::is_trait<meta::defer<iter_arrow_t, I>>::value,
+                        meta::defer<iter_arrow_t, I>,
+                        std::add_pointer<iter_reference_t<I>>>>;
 
         template<typename T>
         struct difference_type_ : meta::defer<iter_difference_t, T>
