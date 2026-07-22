@@ -280,9 +280,11 @@ namespace ranges
     template<typename T>
     CPP_concept viewable_range =
         range<T> &&
-        (borrowed_range<T> ||
-         view_<uncvref_t<T>> ||
-         (movable<uncvref_t<T>> && !detail::is_initializer_list_<uncvref_t<T>>));
+        ((view_<uncvref_t<T>> && constructible_from<uncvref_t<T>, T>) ||
+         (!view_<uncvref_t<T>> &&
+          (std::is_lvalue_reference<T>::value ||
+           (movable<std::remove_reference_t<T>> &&
+            !detail::is_initializer_list_<uncvref_t<T>>))));
     // clang-format on
 
     //////////////////////////////////////////////////////////////////////////////////////
