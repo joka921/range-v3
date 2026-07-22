@@ -54,6 +54,7 @@
 #include <range/v3/view/linear_distribute.hpp>
 #include <range/v3/view/map.hpp>
 #include <range/v3/view/move.hpp>
+#include <range/v3/view/owning.hpp>
 #include <range/v3/view/partial_sum.hpp>
 #include <range/v3/view/ref.hpp>
 #include <range/v3/view/remove.hpp>

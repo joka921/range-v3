@@ -255,6 +255,17 @@ namespace ranges
     // View concepts below
     //
 
+    /// \cond
+    namespace detail
+    {
+        template<typename T>
+        RANGES_INLINE_VAR constexpr bool is_initializer_list_ = false;
+        template<typename T>
+        RANGES_INLINE_VAR constexpr bool
+            is_initializer_list_<std::initializer_list<T>> = true;
+    } // namespace detail
+    /// \endcond
+
     // clang-format off
     /// \concept view_
     /// \brief The \c view_ concept
@@ -269,7 +280,11 @@ namespace ranges
     template<typename T>
     CPP_concept viewable_range =
         range<T> &&
-        (borrowed_range<T> || view_<uncvref_t<T>>);
+        ((view_<uncvref_t<T>> && constructible_from<uncvref_t<T>, T>) ||
+         (!view_<uncvref_t<T>> &&
+          (std::is_lvalue_reference<T>::value ||
+           (movable<std::remove_reference_t<T>> &&
+            !detail::is_initializer_list_<uncvref_t<T>>))));
     // clang-format on
 
     //////////////////////////////////////////////////////////////////////////////////////
