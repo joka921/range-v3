@@ -23,6 +23,7 @@
 #include <range/v3/range/concepts.hpp>
 #include <range/v3/range/primitives.hpp>
 #include <range/v3/utility/static_const.hpp>
+#include <range/v3/view/owning.hpp>
 #include <range/v3/view/ref.hpp>
 #include <range/v3/view/subrange.hpp>
 #include <range/v3/view/view.hpp>
@@ -40,28 +41,25 @@ namespace ranges
         private:
             /// If it's a view already, pass it though.
             template<typename T>
-            static constexpr auto from_range_(T && t, std::true_type, detail::ignore_t,
-                                              detail::ignore_t)
+            static constexpr auto from_range_(T && t, std::true_type, detail::ignore_t)
             {
                 return static_cast<T &&>(t);
             }
 
-            /// If it is container-like, turn it into a view, being careful
+            /// A non-view lvalue range: wrap it in a \c ref_view, being careful
             /// to preserve the Sized-ness of the range.
             template<typename T>
-            static constexpr auto from_range_(T && t, std::false_type, std::true_type,
-                                              detail::ignore_t)
+            static constexpr auto from_range_(T && t, std::false_type, std::true_type)
             {
                 return ranges::views::ref(t);
             }
 
-            /// Not a view and not an lvalue? If it's a borrowed_range, then
-            /// return a subrange holding the range's begin/end.
+            /// A non-view rvalue range: move it into an \c owning_view that keeps
+            /// the range alive for as long as the view exists.
             template<typename T>
-            static constexpr auto from_range_(T && t, std::false_type, std::false_type,
-                                              std::true_type)
+            static constexpr auto from_range_(T && t, std::false_type, std::false_type)
             {
-                return make_subrange(static_cast<T &&>(t));
+                return owning_view<uncvref_t<T>>{static_cast<T &&>(t)};
             }
 
         public:
@@ -71,8 +69,7 @@ namespace ranges
             {
                 return all_fn::from_range_(static_cast<T &&>(t),
                                            meta::bool_<view_<uncvref_t<T>>>{},
-                                           std::is_lvalue_reference<T>{},
-                                           meta::bool_<borrowed_range<T>>{});
+                                           std::is_lvalue_reference<T>{});
             }
 
             template<typename T>

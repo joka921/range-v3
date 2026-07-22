@@ -71,9 +71,13 @@ namespace ranges
 
         struct RANGES_STRUCT_WITH_ADL_BARRIER(shared_closure_base)
         {
-            // Piping requires viewable_ranges.
+            // Piping requires an rvalue range that owns its elements: a range
+            // that is neither a borrowed_range nor already a view. (This is the
+            // set of ranges that views::all would otherwise move into an
+            // owning_view.)
             template(typename Rng, typename SharedFn)(
-                requires range<Rng> AND (!viewable_range<Rng>) AND
+                requires range<Rng> AND
+                    (!(borrowed_range<Rng> || view_<uncvref_t<Rng>>)) AND
                     constructible_from<detail::decay_t<Rng>, Rng>)
             friend constexpr auto operator|(Rng && rng, shared_closure<SharedFn> vw)
             {
@@ -106,7 +110,8 @@ namespace ranges
             struct shared_fn
             {
                 template(typename Rng)(
-                    requires range<Rng> AND (!viewable_range<Rng>)AND
+                    requires range<Rng> AND
+                        (!(borrowed_range<Rng> || view_<uncvref_t<Rng>>))AND
                         constructible_from<detail::decay_t<Rng>, Rng>)
                 shared_view<detail::decay_t<Rng>> operator()(Rng && rng) const
                 {

@@ -50,5 +50,14 @@ int main()
         CHECK(v2.data_->first_ == rgi);
     }
 
+    // An rvalue non-view range is not an lvalue and (usually) not borrowed, so
+    // views::all moves it into an owning_view rather than a ref_view.
+    {
+        owning_view<std::vector<int>> ov = views::all(std::vector<int>(begin(rgi), end(rgi)));
+        CPP_assert(sized_range<decltype(ov)> && view_<decltype(ov)>);
+        CHECK(ov.size() == 7u);
+        CPP_assert(same_as<views::all_t<std::vector<int>>, owning_view<std::vector<int>>>);
+    }
+
     return test_result();
 }
