@@ -44,8 +44,16 @@ namespace ranges
         static_assert(!detail::is_initializer_list_<Rng>,
                       "The template parameter of owning_view may not be an "
                       "initializer_list");
-        Rng rng_ = Rng(); // exposition only
+        Rng rng_; // exposition only
     public:
+        // NOTE: The default member initializer for `rng_` was deliberately
+        // removed (it used to be `Rng rng_ = Rng();`). That initializer forced
+        // `Rng` to be default-constructible, because `owning_view()` is an
+        // unconditionally defaulted constructor. Without it, `owning_view()` is
+        // simply defined as deleted when `Rng` is not default-constructible,
+        // which matches the C++20 behavior (where the default constructor is
+        // constrained on `default_initializable<Rng>`) and allows wrapping
+        // move-only, non-default-constructible ranges.
         owning_view() = default;
         constexpr owning_view(Rng && rng) //
             noexcept(std::is_nothrow_move_constructible<Rng>::value)
