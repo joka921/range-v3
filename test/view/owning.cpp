@@ -9,6 +9,7 @@
 //
 // Project home: https://github.com/ericniebler/range-v3
 
+#include <array>
 #include <list>
 #include <type_traits>
 #include <vector>
@@ -19,6 +20,26 @@
 
 #include "../simple_test.hpp"
 #include "../test_utils.hpp"
+
+namespace
+{
+    // A minimal, move-only range that is NOT default-constructible (its only
+    // constructor takes an `int`). Used to check that `owning_view` can wrap
+    // non-default-constructible ranges without a hard error.
+    struct no_default_range
+    {
+        std::vector<int> v_;
+        explicit no_default_range(int) : v_{1, 2, 3} {}
+        no_default_range(no_default_range &&) = default;
+        no_default_range & operator=(no_default_range &&) = default;
+        no_default_range(no_default_range const &) = delete;
+        no_default_range & operator=(no_default_range const &) = delete;
+        int * begin() { return v_.data(); }
+        int * end() { return v_.data() + v_.size(); }
+        int const * begin() const { return v_.data(); }
+        int const * end() const { return v_.data() + v_.size(); }
+    };
+} // namespace
 
 int main()
 {
@@ -98,6 +119,37 @@ int main()
         CHECK(ov.size() == 3u);
     }
 #endif
+
+    // A non-default-constructible range can still be wrapped: `owning_view` is
+    // then *not* default-constructible either (its default constructor is
+    // defined as deleted), but this is not a hard error, so it can still be
+    // constructed from a value and used like any other owning_view.
+    {
+        using OV = owning_view<no_default_range>;
+        CPP_assert(!std::is_default_constructible<no_default_range>::value);
+        CPP_assert(!std::is_default_constructible<OV>::value);
+        CPP_assert(view_<OV>);
+        CPP_assert(move_constructible<OV>);
+        CPP_assert(sized_range<OV>);
+        OV ov{no_default_range{0}};
+        CHECK(ov.size() == 3u);
+        check_equal(ov, {1, 2, 3});
+        // `views::all` of such an rvalue range yields the same `owning_view`.
+        auto ov2 = views::all(no_default_range{0});
+        CPP_assert(same_as<decltype(ov2), OV>);
+        check_equal(ov2, {1, 2, 3});
+    }
+
+    // For a default-constructible underlying range, the (defaulted) default
+    // constructor value-initializes it, matching the standard's `V r_ = V();`.
+    // For a `std::array` that means all elements are zeroed (rather than left
+    // with indeterminate values, as a plain `Rng rng_;` member would).
+    {
+        using OV = owning_view<std::array<int, 3>>;
+        CPP_assert(std::is_default_constructible<OV>::value);
+        OV ov{};
+        check_equal(ov, {0, 0, 0});
+    }
 
     return test_result();
 }

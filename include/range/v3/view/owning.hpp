@@ -34,6 +34,39 @@ namespace ranges
 {
     /// \addtogroup group-views
     /// @{
+
+    /// \cond
+    namespace detail
+    {
+        // A wrapper around a `T` that conditionally value-initializes it.
+        // `owning_view` uses this for its exposition-only member: its default
+        // constructor is unconditionally `= default` (rather than constrained
+        // on `default_initializable<Rng>` as in C++20, which cannot be
+        // expressed on a defaulted constructor in this dialect). A plain
+        // `Rng rng_ = Rng();` member would therefore force `Rng` to be
+        // default-constructible even when `owning_view` is never default
+        // constructed. `value_init_holder` gives the member the value-
+        // initializing `= T()` initializer only when `T` is default-
+        // constructible, and a plain `T t;` otherwise. As a result
+        // `owning_view` value-initializes its underlying range for
+        // default-constructible `Rng` (matching the C++20 `V r_ = V();`
+        // behavior), and is simply *not* default-constructible for
+        // non-default-constructible, move-only ranges (instead of a hard
+        // error).
+        template<typename T, typename = void>
+        struct value_init_holder
+        {
+            T t;
+        };
+        template<typename T>
+        struct value_init_holder<
+            T, std::enable_if_t<std::is_default_constructible<T>::value>>
+        {
+            T t = T();
+        };
+    } // namespace detail
+    /// \endcond
+
     template<typename Rng>
     struct owning_view : view_interface<owning_view<Rng>, range_cardinality<Rng>::value>
     {
@@ -44,104 +77,102 @@ namespace ranges
         static_assert(!detail::is_initializer_list_<Rng>,
                       "The template parameter of owning_view may not be an "
                       "initializer_list");
-        Rng rng_; // exposition only
+        detail::value_init_holder<Rng> rng_; // exposition only
     public:
-        // NOTE: The default member initializer for `rng_` was deliberately
-        // removed (it used to be `Rng rng_ = Rng();`). That initializer forced
-        // `Rng` to be default-constructible, because `owning_view()` is an
-        // unconditionally defaulted constructor. Without it, `owning_view()` is
-        // simply defined as deleted when `Rng` is not default-constructible,
-        // which matches the C++20 behavior (where the default constructor is
-        // constrained on `default_initializable<Rng>`) and allows wrapping
-        // move-only, non-default-constructible ranges.
+        // `owning_view()` is unconditionally defaulted. Because `rng_` is a
+        // `value_init_holder` (see above), this default constructor value-
+        // initializes the underlying range when `Rng` is default-constructible
+        // (matching the C++20 `V r_ = V();` behavior), and is implicitly
+        // defined as deleted when `Rng` is not default-constructible (rather
+        // than being a hard error, so move-only ranges can still be wrapped).
         owning_view() = default;
         constexpr owning_view(Rng && rng) //
             noexcept(std::is_nothrow_move_constructible<Rng>::value)
-          : rng_(detail::move(rng))
+          : rng_{detail::move(rng)}
         {}
         owning_view(owning_view &&) = default;
         owning_view & operator=(owning_view &&) = default;
 
         constexpr Rng & base() & noexcept
         {
-            return rng_;
+            return rng_.t;
         }
         constexpr Rng const & base() const & noexcept
         {
-            return rng_;
+            return rng_.t;
         }
         constexpr Rng && base() && noexcept
         {
-            return detail::move(rng_);
+            return detail::move(rng_.t);
         }
         constexpr Rng const && base() const && noexcept
         {
-            return detail::move(rng_);
+            return detail::move(rng_.t);
         }
 
-        constexpr iterator_t<Rng> begin() noexcept(noexcept(ranges::begin(rng_)))
+        constexpr iterator_t<Rng> begin() noexcept(noexcept(ranges::begin(rng_.t)))
         {
-            return ranges::begin(rng_);
+            return ranges::begin(rng_.t);
         }
-        constexpr sentinel_t<Rng> end() noexcept(noexcept(ranges::end(rng_)))
+        constexpr sentinel_t<Rng> end() noexcept(noexcept(ranges::end(rng_.t)))
         {
-            return ranges::end(rng_);
+            return ranges::end(rng_.t);
         }
         CPP_auto_member
         constexpr auto CPP_fun(begin)()(const //
-            noexcept(noexcept(ranges::begin(rng_))) //
+            noexcept(noexcept(ranges::begin(rng_.t))) //
             requires range<Rng const>)
         {
-            return ranges::begin(rng_);
+            return ranges::begin(rng_.t);
         }
         CPP_auto_member
         constexpr auto CPP_fun(end)()(const //
-            noexcept(noexcept(ranges::end(rng_))) //
+            noexcept(noexcept(ranges::end(rng_.t))) //
             requires range<Rng const>)
         {
-            return ranges::end(rng_);
+            return ranges::end(rng_.t);
         }
         CPP_member
-        constexpr auto empty() noexcept(noexcept(ranges::empty(rng_)))
+        constexpr auto empty() noexcept(noexcept(ranges::empty(rng_.t)))
             -> CPP_ret(bool)(
                 requires detail::can_empty_<Rng>)
         {
-            return ranges::empty(rng_);
+            return ranges::empty(rng_.t);
         }
         CPP_member
-        constexpr auto empty() const noexcept(noexcept(ranges::empty(rng_)))
+        constexpr auto empty() const noexcept(noexcept(ranges::empty(rng_.t)))
             -> CPP_ret(bool)(
                 requires detail::can_empty_<Rng const>)
         {
-            return ranges::empty(rng_);
+            return ranges::empty(rng_.t);
         }
         CPP_auto_member
         constexpr auto CPP_fun(size)()(
-            noexcept(noexcept(ranges::size(rng_))) //
+            noexcept(noexcept(ranges::size(rng_.t))) //
             requires sized_range<Rng>)
         {
-            return ranges::size(rng_);
+            return ranges::size(rng_.t);
         }
         CPP_auto_member
         constexpr auto CPP_fun(size)()(const //
-            noexcept(noexcept(ranges::size(rng_))) //
+            noexcept(noexcept(ranges::size(rng_.t))) //
             requires sized_range<Rng const>)
         {
-            return ranges::size(rng_);
+            return ranges::size(rng_.t);
         }
         CPP_auto_member
         constexpr auto CPP_fun(data)()(
-            noexcept(noexcept(ranges::data(rng_))) //
+            noexcept(noexcept(ranges::data(rng_.t))) //
             requires contiguous_range<Rng>)
         {
-            return ranges::data(rng_);
+            return ranges::data(rng_.t);
         }
         CPP_auto_member
         constexpr auto CPP_fun(data)()(const //
-            noexcept(noexcept(ranges::data(rng_))) //
+            noexcept(noexcept(ranges::data(rng_.t))) //
             requires contiguous_range<Rng const>)
         {
-            return ranges::data(rng_);
+            return ranges::data(rng_.t);
         }
     };
 
