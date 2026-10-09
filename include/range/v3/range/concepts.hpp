@@ -237,6 +237,10 @@ namespace ranges
         ext::enable_view<T>::value || std::ranges::enable_view<T>;
 #endif
 
+    // When combined with `std::ranges`, the primary template above already asks
+    // `std::ranges::enable_view`, so the specializations for standard library
+    // types are only needed without it.
+#ifndef RANGE_V3_COMBINE_WITH_STD
 #if defined(__cpp_lib_string_view) && __cpp_lib_string_view >= 201603L
     template<typename Char, typename Traits>
     RANGES_INLINE_VAR constexpr bool enable_view<std::basic_string_view<Char, Traits>> =
@@ -249,6 +253,7 @@ namespace ranges
     (!defined(__GLIBCXX__) || defined(__cpp_lib_concepts))
     template<typename T, std::size_t N>
     RANGES_INLINE_VAR constexpr bool enable_view<std::span<T, N>> = true;
+#endif
 #endif
 
     //

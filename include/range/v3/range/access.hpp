@@ -42,6 +42,12 @@
 
 namespace ranges
 {
+    // When combined with `std::ranges`, the standard library already knows which
+    // of its types are borrowed ranges, see `_borrowed_range` below. Declaring
+    // range-v3's own specializations for these types in addition can then be
+    // too late (the bridge at the end of `range_fwd.hpp` may already have
+    // instantiated `enable_borrowed_range` for them), so we don't declare them.
+#ifndef RANGE_V3_COMBINE_WITH_STD
 #if defined(__cpp_lib_string_view) && __cpp_lib_string_view >= 201603L
     template<class CharT, class Traits>
     RANGES_INLINE_VAR constexpr bool
@@ -55,12 +61,18 @@ namespace ranges
     template<class T, std::size_t N>
     RANGES_INLINE_VAR constexpr bool enable_borrowed_range<std::span<T, N>> = true;
 #endif
+#endif
 
     namespace detail
     {
         template<typename T>
         RANGES_INLINE_VAR constexpr bool _borrowed_range =
+#ifdef RANGE_V3_COMBINE_WITH_STD
+            enable_borrowed_range<uncvref_t<T>> ||
+            std::ranges::enable_borrowed_range<uncvref_t<T>>;
+#else
             enable_borrowed_range<uncvref_t<T>>;
+#endif
 
         template<typename T>
         RANGES_INLINE_VAR constexpr bool _borrowed_range<T &> = true;
