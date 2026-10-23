@@ -108,13 +108,32 @@ namespace ranges
             template<
                 typename I,
                 typename = detail::enable_if_t<!is_adl_indirectly_movable_v<I &>>,
-                typename R = iter_reference_t<I>>
+                typename R = iter_reference_t<I>,
+                typename = detail::enable_if_t<std::is_reference<R>::value>>
 #ifndef RANGES_WORKAROUND_CLANG_23135
             constexpr
 #endif // RANGES_WORKAROUND_CLANG_23135
             auto CPP_auto_fun(operator())(I &&i)(const)
             (
                 return static_cast<aux::move_t<R>>(aux::move(*i))
+            )
+
+            // If `*i` is a prvalue, return it directly like `std::ranges::iter_move`
+            // ([iterator.cust.move]) instead of moving it into a new object, so
+            // that this also works for proxy references that are not movable
+            // (e.g. because their copy constructor is deleted).
+            template<
+                typename I,
+                typename = detail::enable_if_t<!is_adl_indirectly_movable_v<I &>>,
+                typename R = iter_reference_t<I>,
+                typename = detail::enable_if_t<!std::is_reference<R>::value>,
+                typename = void>
+#ifndef RANGES_WORKAROUND_CLANG_23135
+            constexpr
+#endif // RANGES_WORKAROUND_CLANG_23135
+            auto CPP_auto_fun(operator())(I &&i)(const)
+            (
+                return *i
             )
             // clang-format on
         };
