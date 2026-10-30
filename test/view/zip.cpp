@@ -326,5 +326,34 @@ int main()
         CHECK(ranges::distance(ranges::end(rng), ranges::begin(rng)) == -3);
     }
 
+#ifdef __cpp_lib_apply
+    // The elements of a zip view work with `std::apply`, can be converted to and
+    // compared with `std::pair` and `std::tuple`, also since C++23, where these
+    // require "tuple-like" types (see `common_type.hpp`).
+    {
+        std::vector<int> v0{1, 2, 3};
+        std::vector<int> v1{4, 5, 6};
+        std::vector<int> v2{7, 8, 9};
+        int sum = 0;
+        for(auto && p : views::zip(v0, v1))
+            sum += std::apply([](int a, int b) { return a + b; }, p);
+        for(auto && t : views::zip(v0, v1, v2))
+            sum += std::apply([](int a, int b, int c) { return a + b + c; }, t);
+        CHECK(sum == 66);
+
+        std::pair<int, int> p = *ranges::begin(views::zip(v0, v1));
+        CHECK(p.first == 1);
+        CHECK(p.second == 4);
+        // The comparisons are evaluated outside of `CHECK`, which wraps its left
+        // operand in a helper type.
+        auto it = ranges::begin(views::zip(v0, v1, v2));
+        std::tuple<int, int, int> t = *it;
+        bool const equal = t == *it && *it == t;
+        CHECK(equal);
+        bool const less = t != *ranges::next(it) && t < *ranges::next(it);
+        CHECK(less);
+    }
+#endif
+
     return test_result();
 }

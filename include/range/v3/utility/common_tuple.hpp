@@ -91,6 +91,7 @@ namespace ranges
     } // namespace detail
     /// \endcond
 
+#if !RANGES_COMMON_TUPLE_IS_STD_TUPLE
     template<typename... Ts>
     struct common_tuple : _tuple_wrapper_::forward_tuple_interface<std::tuple<Ts...>>
     {
@@ -291,6 +292,7 @@ namespace ranges
     LOGICAL_OP(>, totally_ordered_with)
     LOGICAL_OP(>=, totally_ordered_with)
 #undef LOGICAL_OP
+#endif // !RANGES_COMMON_TUPLE_IS_STD_TUPLE
 
     struct make_common_tuple_fn
     {
@@ -308,6 +310,7 @@ namespace ranges
     /// \sa `make_common_tuple_fn`
     RANGES_INLINE_VARIABLE(make_common_tuple_fn, make_common_tuple)
 
+#if !RANGES_COMMON_TUPLE_IS_STD_TUPLE
     template<typename F, typename S>
     struct common_pair : std::pair<F, S>
     {
@@ -512,6 +515,7 @@ namespace ranges
     LOGICAL_OP(>, totally_ordered_with, (b < a))
     LOGICAL_OP(>=, totally_ordered_with, !(a < b))
 #undef LOGICAL_OP
+#endif // !RANGES_COMMON_TUPLE_IS_STD_TUPLE
 
     struct make_common_pair_fn
     {
@@ -563,7 +567,12 @@ namespace ranges
 /// \cond
 namespace concepts
 {
+    // With `RANGES_COMMON_TUPLE_IS_STD_TUPLE`, the specializations for
+    // `common_pair`/`common_tuple` and `std::pair`/`std::tuple` are the same as
+    // the ones for two `common_pair`s/`common_tuple`s, so they are omitted.
+
     // common_type for pairs
+#if !RANGES_COMMON_TUPLE_IS_STD_TUPLE
     template<typename F1, typename S1, typename F2, typename S2>
     struct common_type<std::pair<F1, S1>, ranges::common_pair<F2, S2>>
       : ranges::detail::common_type_tuple_like<
@@ -576,6 +585,7 @@ namespace concepts
             ranges::common_pair<F1, S1>, std::pair<F2, S2>,
             meta::quote<ranges::common_pair>>
     {};
+#endif
     template<typename F1, typename S1, typename F2, typename S2>
     struct common_type<ranges::common_pair<F1, S1>, ranges::common_pair<F2, S2>>
       : ranges::detail::common_type_tuple_like<ranges::common_pair<F1, S1>,
@@ -583,6 +593,7 @@ namespace concepts
                                                meta::quote<ranges::common_pair>>
     {};
     // common_type for tuples
+#if !RANGES_COMMON_TUPLE_IS_STD_TUPLE
     template<typename... Ts, typename... Us>
     struct common_type<ranges::common_tuple<Ts...>, std::tuple<Us...>>
       : ranges::detail::common_type_tuple_like<
@@ -595,6 +606,7 @@ namespace concepts
             std::tuple<Ts...>, ranges::common_tuple<Us...>,
             meta::quote<ranges::common_tuple>>
     {};
+#endif
     template<typename... Ts, typename... Us>
     struct common_type<ranges::common_tuple<Ts...>, ranges::common_tuple<Us...>>
       : ranges::detail::common_type_tuple_like<ranges::common_tuple<Ts...>,
@@ -603,6 +615,7 @@ namespace concepts
     {};
 
     // common reference for pairs
+#if !RANGES_COMMON_TUPLE_IS_STD_TUPLE
     template<typename F1, typename S1, typename F2, typename S2,
              template<typename> class Qual1, template<typename> class Qual2>
     struct basic_common_reference<ranges::common_pair<F1, S1>, std::pair<F2, S2>, Qual1,
@@ -619,6 +632,7 @@ namespace concepts
             std::pair<Qual1<F1>, Qual1<S1>>, ranges::common_pair<Qual2<F2>, Qual2<S2>>,
             meta::quote<ranges::common_pair>>
     {};
+#endif
     template<typename F1, typename S1, typename F2, typename S2,
              template<typename> class Qual1, template<typename> class Qual2>
     struct basic_common_reference<ranges::common_pair<F1, S1>,
@@ -628,6 +642,7 @@ namespace concepts
                                               meta::quote<ranges::common_pair>>
     {};
     // common reference for tuples
+#if !RANGES_COMMON_TUPLE_IS_STD_TUPLE
     template<typename... Ts, typename... Us, template<typename> class Qual1,
              template<typename> class Qual2>
     struct basic_common_reference<ranges::common_tuple<Ts...>, std::tuple<Us...>, Qual1,
@@ -644,6 +659,7 @@ namespace concepts
             std::tuple<Qual1<Ts>...>, ranges::common_tuple<Qual2<Us>...>,
             meta::quote<ranges::common_tuple>>
     {};
+#endif
     template<typename... Ts, typename... Us, template<typename> class Qual1,
              template<typename> class Qual2>
     struct basic_common_reference<ranges::common_tuple<Ts...>,
@@ -655,6 +671,9 @@ namespace concepts
 } // namespace concepts
 /// \endcond
 
+// With `RANGES_COMMON_TUPLE_IS_STD_TUPLE`, the standard library itself has all of
+// the following for `std::pair` and `std::tuple`.
+#if !RANGES_COMMON_TUPLE_IS_STD_TUPLE
 RANGES_DIAGNOSTIC_PUSH
 RANGES_DIAGNOSTIC_IGNORE_MISMATCHED_TAGS
 RANGES_BEGIN_NAMESPACE_STD
@@ -786,6 +805,7 @@ RANGES_END_NAMESPACE_VERSION
 #endif // RANGES_CXX_VER > RANGES_CXX_STD_17
 RANGES_END_NAMESPACE_STD
 RANGES_DIAGNOSTIC_POP
+#endif // !RANGES_COMMON_TUPLE_IS_STD_TUPLE
 
 #include <range/v3/detail/epilogue.hpp>
 
