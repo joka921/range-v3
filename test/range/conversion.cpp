@@ -420,6 +420,35 @@ void test_additional_arguments()
 #endif
 }
 
+// Test the decrement operators of the internal iterator that is used to
+// convert a range of ranges into a container of containers. The postfix
+// decrement used to increment the underlying iterator and return a dangling
+// reference.
+void test_to_container_iterator_decrement()
+{
+    using namespace ranges;
+    using inner_t = std::vector<int>;
+    std::vector<inner_t> const src{{1}, {2, 2}, {3, 3, 3}};
+    using it_t =
+        detail::to_container_iterator<std::vector<inner_t> const &, std::list<inner_t>>;
+    CPP_assert(same_as<decltype(std::declval<it_t &>()--), it_t>);
+    CPP_assert(same_as<decltype(--std::declval<it_t &>()), it_t &>);
+
+    it_t it{src.end()};
+    auto const old = it--;
+    CHECK(old == it_t{src.end()});
+    CHECK(it == it_t{src.begin() + 2});
+    check_equal(*it, {3, 3, 3});
+
+    auto const old2 = it--;
+    check_equal(*old2, {3, 3, 3});
+    check_equal(*it, {2, 2});
+
+    CHECK(&--it == &it);
+    CHECK(it == it_t{src.begin()});
+    check_equal(*it, {1});
+}
+
 void test_construction_strategies()
 {
     using namespace ranges;
@@ -636,6 +665,7 @@ int main()
 
     test_additional_arguments();
     test_construction_strategies();
+    test_to_container_iterator_decrement();
 
     return ::test_result();
 }
