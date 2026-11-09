@@ -303,10 +303,21 @@ namespace ranges
 
         /// \concept to_container_reserve
         /// \brief The \c to_container_reserve concept
+        // Note: `c.assign(first, last)` assigns the elements of the range to
+        // existing elements of the container (and for input iterators also
+        // move-assigns elements when inserting), so the value type of the
+        // container has to be assignable from the elements of the range and
+        // move-assignable. Without these checks, `ranges::to` would select the
+        // `reserve` + `assign` strategy and then fail to compile for element
+        // types that are only constructible from the elements of the range
+        // (e.g. types with `const` or reference members, or types that are
+        // only explicitly constructible from the elements of the range).
         template<typename C, typename I, typename R>
         CPP_concept to_container_reserve = //
             reservable_with_assign<C, I> && //
-            sized_range<R>;
+            sized_range<R> && //
+            std::is_assignable<range_value_t<C> &, iter_reference_t<I>>::value && //
+            std::is_move_assignable<range_value_t<C>>::value;
 
         /// \concept to_reservable_container
         /// \brief The exposition-only \c reservable-container concept of
@@ -423,6 +434,15 @@ namespace ranges
             static constexpr bool append_ =
                 constructible_from<C, Args...> &&
                 to_container_appendable<C, range_reference_t<Rng>>;
+            // If the `reserve` + `assign` strategy cannot be used (e.g. because
+            // the elements are not assignable), then for a sized range that is
+            // not a forward range, the iterator-pair constructor cannot
+            // determine the number of elements in advance. Prefer `reserve` +
+            // appending each element in this case (a range-v3 specific
+            // deviation from the order of the standard).
+            static constexpr bool reserve_append_ =
+                append_ && sized_range<Rng> && !forward_range<Rng> &&
+                to_reservable_container<C>;
 
         public:
             static constexpr to_kind value =
@@ -430,6 +450,7 @@ namespace ranges
                 : direct_                       ? to_kind::direct
                 : from_range_                   ? to_kind::from_range
                 : reserve_assign_               ? to_kind::reserve_assign
+                : reserve_append_               ? to_kind::append
                 : iterators_                    ? to_kind::iterators
                 : append_                       ? to_kind::append
                                                 : to_kind::none;

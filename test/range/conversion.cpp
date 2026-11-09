@@ -537,6 +537,88 @@ void test_construction_strategies()
     }
 }
 
+// An element type that is copy-constructible, but not assignable (because of
+// its `const` member). `ranges::to` must not use `c.assign(first, last)`.
+struct non_assignable
+{
+    int const value;
+    non_assignable(int v)
+      : value(v)
+    {}
+    friend bool operator==(non_assignable const & a, non_assignable const & b)
+    {
+        return a.value == b.value;
+    }
+};
+
+// An element type that can only explicitly be constructed from an `int`.
+struct explicit_from_int
+{
+    int value;
+    explicit explicit_from_int(int v)
+      : value(v)
+    {}
+};
+
+void test_non_assignable_and_explicit_elements()
+{
+    using namespace ranges;
+    auto rng = views::iota(0, 5);
+    auto values = [](auto const & c) {
+        std::vector<int> result;
+        for(auto const & x : c)
+            result.push_back(x.value);
+        return result;
+    };
+
+    // Elements that are not assignable, from a sized and a non-sized range,
+    // with and without additional constructor arguments.
+    {
+        auto v = ranges::to<std::vector<non_assignable>>(rng);
+        check_equal(values(v), {0, 1, 2, 3, 4});
+        auto v2 = rng | views::take_while([](int i) { return i < 3; }) |
+                  ranges::to<std::vector<non_assignable>>();
+        check_equal(values(v2), {0, 1, 2});
+        using alloc_t = tagged_allocator<non_assignable>;
+        auto v3 = ranges::to<std::vector<non_assignable, alloc_t>>(rng, alloc_t{42});
+        CHECK(v3.get_allocator().tag == 42);
+        check_equal(values(v3), {0, 1, 2, 3, 4});
+    }
+
+    // Elements that are only explicitly constructible from the elements of
+    // the range.
+    {
+        auto v = ranges::to<std::vector<explicit_from_int>>(rng);
+        check_equal(values(v), {0, 1, 2, 3, 4});
+        auto v2 = rng | views::take_while([](int i) { return i < 3; }) |
+                  ranges::to<std::vector<explicit_from_int>>();
+        check_equal(values(v2), {0, 1, 2});
+        using alloc_t = tagged_allocator<explicit_from_int>;
+        auto v3 = rng | ranges::to<std::vector<explicit_from_int, alloc_t>>(alloc_t{7});
+        CHECK(v3.get_allocator().tag == 7);
+        check_equal(values(v3), {0, 1, 2, 3, 4});
+    }
+
+    // A sized input range (which is not a forward range) with non-assignable
+    // elements: the container must still be reserved in advance.
+    {
+        int ints[] = {0, 1, 2, 3, 4};
+        using I = InputIterator<int *>;
+        using S = Sentinel<int *>;
+        auto input = ranges::subrange<I, S, subrange_kind::sized>{I{ints}, S{ints + 5}, 5};
+        CPP_assert(sized_range<decltype(input)>);
+        CPP_assert(!forward_range<decltype(input)>);
+        auto v = ranges::to<std::vector<non_assignable>>(input);
+        check_equal(values(v), {0, 1, 2, 3, 4});
+        CHECK(v.capacity() == 5u);
+
+        auto input2 = ranges::subrange<I, S, subrange_kind::sized>{I{ints}, S{ints + 5}, 5};
+        auto v2 = ranges::to<std::vector<explicit_from_int>>(input2);
+        check_equal(values(v2), {0, 1, 2, 3, 4});
+        CHECK(v2.capacity() == 5u);
+    }
+}
+
 int main()
 {
     using namespace ranges;
@@ -666,6 +748,7 @@ int main()
     test_additional_arguments();
     test_construction_strategies();
     test_to_container_iterator_decrement();
+    test_non_assignable_and_explicit_elements();
 
     return ::test_result();
 }
