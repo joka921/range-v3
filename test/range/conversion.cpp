@@ -551,6 +551,18 @@ struct non_assignable
     }
 };
 
+// An element type that can only explicitly be constructed from a
+// `std::string`. As `std::string` is a range itself, `ranges::to` also checks
+// whether a nested conversion is possible (with the non-range
+// `explicit_from_string` as the target), which must not be a hard error.
+struct explicit_from_string
+{
+    std::string value;
+    explicit explicit_from_string(std::string v)
+      : value(std::move(v))
+    {}
+};
+
 // An element type that can only explicitly be constructed from an `int`.
 struct explicit_from_int
 {
@@ -597,6 +609,15 @@ void test_non_assignable_and_explicit_elements()
         auto v3 = rng | ranges::to<std::vector<explicit_from_int, alloc_t>>(alloc_t{7});
         CHECK(v3.get_allocator().tag == 7);
         check_equal(values(v3), {0, 1, 2, 3, 4});
+    }
+
+    // Elements that are only explicitly constructible from a range type.
+    {
+        std::vector<std::string> strings{"a", "bc"};
+        auto v = ranges::to<std::vector<explicit_from_string>>(strings);
+        CHECK(v.size() == 2u);
+        CHECK(v[0].value == "a");
+        CHECK(v[1].value == "bc");
     }
 
     // A sized input range (which is not a forward range) with non-assignable

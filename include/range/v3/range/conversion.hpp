@@ -312,12 +312,24 @@ namespace ranges
         // types that are only constructible from the elements of the range
         // (e.g. types with `const` or reference members, or types that are
         // only explicitly constructible from the elements of the range).
+        // Note: Without concepts (C++14/17), all the operands of `&&` in a
+        // `CPP_concept` are instantiated, so the assignability checks are
+        // wrapped in a class template that only accesses `range_value_t<C>`
+        // if `C` is a range.
+        template<typename C, typename I, bool = (bool)range<C>>
+        struct to_container_assignable : std::false_type
+        {};
+        template<typename C, typename I>
+        struct to_container_assignable<C, I, true>
+          : meta::bool_<
+                std::is_assignable<range_value_t<C> &, iter_reference_t<I>>::value &&
+                std::is_move_assignable<range_value_t<C>>::value>
+        {};
         template<typename C, typename I, typename R>
         CPP_concept to_container_reserve = //
             reservable_with_assign<C, I> && //
             sized_range<R> && //
-            std::is_assignable<range_value_t<C> &, iter_reference_t<I>>::value && //
-            std::is_move_assignable<range_value_t<C>>::value;
+            to_container_assignable<C, I>::value;
 
         /// \concept to_reservable_container
         /// \brief The exposition-only \c reservable-container concept of
